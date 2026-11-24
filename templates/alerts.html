@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mmWave Radar - Alert Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    <style>
+        .alert-critical { background-color: #ffdddd; border-left: 4px solid #dc3545; }
+        .alert-warning { background-color: #fff3cd; border-left: 4px solid #ffc107; }
+        .alert-info { background-color: #d1ecf1; border-left: 4px solid #0dcaf0; }
+        .alert-acknowledged { opacity: 0.7; }
+        .alert-card { transition: all 0.3s; }
+        .alert-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fa-solid fa-radar"></i> mmWave Radar System
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fa-solid fa-gauge"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/config">
+                            <i class="fa-solid fa-sliders"></i> Configuration
+                        </a>
+                    </li>
+                    <li class="nav-item position-relative">
+                        <a class="nav-link active" href="/alerts">
+                            <i class="fa-solid fa-bell"></i> Alerts
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/performance">
+                            <i class="fa-solid fa-chart-line"></i> Performance
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/targets">
+                            <i class="fa-solid fa-bullseye"></i> Targets
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="fa-solid fa-bell"></i> Alert Management
+            </h1>
+            <div>
+                <button class="btn btn-outline-danger" id="clearAlertsBtn">
+                    <i class="fa-solid fa-trash-can"></i> Clear All
+                </button>
+            </div>
+        </div>
+        
+        <div class="row" id="alertSummary">
+            <div class="col-md-3 mb-4">
+                <div class="card alert-card border-danger">
+                    <div class="card-body text-center">
+                        <div class="text-danger mb-2">
+                            <i class="fa-solid fa-circle-exclamation fa-3x"></i>
+                        </div>
+                        <h3 class="text-danger" id="activeAlertCount">0</h3>
+                        <p class="text-muted">Active Alerts</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-4">
+                <div class="card alert-card border-warning">
+                    <div class="card-body text-center">
+                        <div class="text-warning mb-2">
+                            <i class="fa-solid fa-triangle-exclamation fa-3x"></i>
+                        </div>
+                        <h3 class="text-warning" id="motionAlertCount">0</h3>
+                        <p class="text-muted">Motion Alerts</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-4">
+                <div class="card alert-card border-info">
+                    <div class="card-body text-center">
+                        <div class="text-info mb-2">
+                            <i class="fa-solid fa-gear fa-3x"></i>
+                        </div>
+                        <h3 class="text-info" id="systemAlertCount">0</h3>
+                        <p class="text-muted">System Alerts</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-4">
+                <div class="card alert-card border-success">
+                    <div class="card-body text-center">
+                        <div class="text-success mb-2">
+                            <i class="fa-solid fa-circle-check fa-3x"></i>
+                        </div>
+                        <h3 class="text-success" id="acknowledgedAlertCount">0</h3>
+                        <p class="text-muted">Acknowledged</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#active-alerts">Active Alerts</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#acknowledged-alerts">Acknowledged</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#all-alerts">All Alerts</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="active-alerts">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="activeAlertsTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Type</th>
+                                        <th>Timestamp</th>
+                                        <th>Target</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for alert in alerts if not alert.acknowledged %}
+                                    <tr class="{% if alert.type == 'System Critical' %}table-danger{% elif alert.type == 'Motion Detected' %}table-warning{% else %}table-info{% endif %}">
+                                        <td>{{ alert.id }}</td>
+                                        <td>{{ alert.type }}</td>
+                                        <td>{{ alert.timestamp }}</td>
+                                        <td>
+                                            {% if alert.target %}
+                                            Target #{{ alert.target.id }} ({{ "%.1f"|format(alert.target.avg_range) }}m)
+                                            {% else %}
+                                            System
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary acknowledge-btn" data-id="{{ alert.id }}">
+                                                <i class="fa-solid fa-check"></i> Acknowledge
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4">
+                                            <i class="fa-solid fa-face-smile-beam fa-3x text-success mb-3"></i>
+                                            <h4>No Active Alerts</h4>
+                                            <p class="text-muted">All alerts have been acknowledged</p>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-pane fade" id="acknowledged-alerts">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Type</th>
+                                        <th>Timestamp</th>
+                                        <th>Target</th>
+                                        <th>Acknowledged</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for alert in alerts if alert.acknowledged %}
+                                    <tr class="table-secondary">
+                                        <td>{{ alert.id }}</td>
+                                        <td>{{ alert.type }}</td>
+                                        <td>{{ alert.timestamp }}</td>
+                                        <td>
+                                            {% if alert.target %}
+                                            Target #{{ alert.target.id }} ({{ "%.1f"|format(alert.target.avg_range) }}m)
+                                            {% else %}
+                                            System
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">Yes</span>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4">
+                                            <i class="fa-solid fa-inbox fa-3x text-muted mb-3"></i>
+                                            <h4>No Acknowledged Alerts</h4>
+                                            <p class="text-muted">No alerts have been acknowledged yet</p>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-pane fade" id="all-alerts">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Type</th>
+                                        <th>Timestamp</th>
+                                        <th>Target</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for alert in alerts %}
+                                    <tr class="{% if alert.acknowledged %}table-secondary{% elif alert.type == 'System Critical' %}table-danger{% elif alert.type == 'Motion Detected' %}table-warning{% else %}table-info{% endif %}">
+                                        <td>{{ alert.id }}</td>
+                                        <td>{{ alert.type }}</td>
+                                        <td>{{ alert.timestamp }}</td>
+                                        <td>
+                                            {% if alert.target %}
+                                            Target #{{ alert.target.id }} ({{ "%.1f"|format(alert.target.avg_range) }}m)
+                                            {% else %}
+                                            System
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if alert.acknowledged %}
+                                            <span class="badge bg-success">Acknowledged</span>
+                                            {% else %}
+                                            <span class="badge bg-warning">Active</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4">
+                                            <i class="fa-solid fa-inbox fa-3x text-muted mb-3"></i>
+                                            <h4>No Alerts</h4>
+                                            <p class="text-muted">No alerts have been generated</p>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Update alert counts
+        function updateAlertCounts() {
+            $.get('/alert_counts', function(data) {
+                $('#activeAlertCount').text(data.total_active);
+                $('#motionAlertCount').text(data.motion_alerts);
+                $('#systemAlertCount').text(data.system_alerts);
+                $('#acknowledgedAlertCount').text(data.acknowledged);
+            });
+        }
+        
+        // Acknowledge alert
+        $(document).on('click', '.acknowledge-btn', function() {
+            const alertId = $(this).data('id');
+            $.post('/acknowledge_alert/' + alertId, function() {
+                // Refresh active alerts
+                $.get('/alerts?partial=active', function(html) {
+                    $('#activeAlertsTable tbody').html(html);
+                    updateAlertCounts();
+                });
+            });
+        });
+        
+        // Clear all alerts
+        $('#clearAlertsBtn').click(function() {
+            if (confirm('Are you sure you want to clear all alerts? This cannot be undone.')) {
+                // Find all active alert IDs
+                const alertIds = [];
+                $('.acknowledge-btn').each(function() {
+                    alertIds.push($(this).data('id'));
+                });
+                
+                // Acknowledge all alerts
+                alertIds.forEach(id => {
+                    $.post('/acknowledge_alert/' + id);
+                });
+                
+                // Refresh after a short delay
+                setTimeout(function() {
+                    location.reload();
+                }, 500);
+            }
+        });
+        
+        // Initialize and update every 5 seconds
+        updateAlertCounts();
+        setInterval(updateAlertCounts, 5000);
+    </script>
+</body>
+</html>

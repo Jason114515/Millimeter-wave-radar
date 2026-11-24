@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mmWave Radar - Performance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .perf-card { transition: transform 0.3s; }
+        .perf-card:hover { transform: translateY(-5px); }
+        .metric-value { font-size: 2rem; font-weight: 600; }
+        .metric-label { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
+        .improvement { color: #28a745; }
+        .decline { color: #dc3545; }
+        .comparison-bar { height: 30px; border-radius: 15px; }
+        .algorithm-card { border-left: 4px solid; }
+        .original-algo { border-left-color: #6c757d; }
+        .optimized-algo { border-left-color: #28a745; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fa-solid fa-radar"></i> mmWave Radar System
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fa-solid fa-gauge"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/config">
+                            <i class="fa-solid fa-sliders"></i> Configuration
+                        </a>
+                    </li>
+                    <li class="nav-item position-relative">
+                        <a class="nav-link" href="/alerts">
+                            <i class="fa-solid fa-bell"></i> Alerts
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/performance">
+                            <i class="fa-solid fa-chart-line"></i> Performance
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/targets">
+                            <i class="fa-solid fa-bullseye"></i> Targets
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">
+            <i class="fa-solid fa-chart-line"></i> Algorithm Performance
+        </h1>
+        
+        <div class="row mb-4" id="performanceMetrics">
+            <div class="col-md-3">
+                <div class="card perf-card mb-4">
+                    <div class="card-body text-center">
+                        <div class="metric-value improvement" id="accuracyImp">
+                            {{ "%.1f"|format(performance.accuracy_improvement) }}%
+                        </div>
+                        <div class="metric-label text-muted">Accuracy Improvement</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="card perf-card mb-4">
+                    <div class="card-body text-center">
+                        <div class="metric-value decline" id="fpReduction">
+                            {{ "%.1f"|format(performance.false_positive_reduction) }}%
+                        </div>
+                        <div class="metric-label text-muted">False Positive Reduction</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="card perf-card mb-4">
+                    <div class="card-body text-center">
+                        <div class="metric-value" id="originalTime">
+                            {{ "%.0f"|format(performance.original_processing_time * 1000) }}ms
+                        </div>
+                        <div class="metric-label text-muted">Original Processing</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="card perf-card mb-4">
+                    <div class="card-body text-center">
+                        <div class="metric-value improvement" id="optimizedTime">
+                            {{ "%.0f"|format(performance.optimized_processing_time * 1000) }}ms
+                        </div>
+                        <div class="metric-label text-muted">Optimized Processing</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        Processing Time Comparison
+                    </div>
+                    <div class="card-body">
+                        <div class="position-relative" style="height: 300px;">
+                            <canvas id="processingTimeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        Detection Accuracy
+                    </div>
+                    <div class="card-body">
+                        <div class="position-relative" style="height: 300px;">
+                            <canvas id="accuracyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        Algorithm Comparison
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card algorithm-card original-algo mb-4">
+                                    <div class="card-header bg-light">
+                                        <i class="fa-solid fa-microchip"></i> Original Algorithm
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="list-group list-group-flush">
+                                            <li class="list-group-item">
+                                                <i class="fa-solid fa-clock"></i> Processing Time: 
+                                                <strong>{{ "%.0f"|format(performance.original_processing_time * 1000) }}ms</strong>
+                                            </li>
+                                            <li class="list-group-item">
+                                                <i class="fa-solid fa-bullseye"></i> Detection Accuracy: 
+                                                <strong>{{ "%.1f"|format(85 - performance.accuracy_improvement) }}%</strong>
+                                            </li>
+                                            <li class="list-group-item">
+                                                <i class="fa-solid fa-triangle-exclamation"></i> False Positives: 
+                                                <strong>{{ "%.1f"|format(12 - performance.false_positive_reduction) }}%</strong>
+                                            </li>
+                                            <li class="list-group-item">
+                                                <i class="fa-solid fa-memory"></i> Memory Usage: 
+                                                <strong>High</strong>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card algorithm-card optimized-algo mb-4">
+                                    <div class="card-header bg-light">
+                                        <i class="fa-solid fa-rocket"></i> Optimized Algorithm
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="list-group list-group-flush">
+                                            <li class="list-group-item">
+                                                <i class="fa-solid fa-clock"></i> Processing Time: 
+                                                <strong class="improvement">{{ "%.0f"|format(performance.optimized_processing_time * 1000) }}ms</strong>
+                                            </li>
+                                            <li class="list-group-item">
+                                                <i class="fa-solid fa-bullseye"></i> Detection Accuracy: 
+                                                <strong class="improvement">{{ "%.1f"|format(85) }}%</strong>
+                                            </li>
+                                            <li class="list-group-item">
+                                                <i class="fa-solid fa-triangle-exclamation"></i> False Positives: 
+                                                <strong class="improvement">{{ "%.1f"|format(12 - performance.false_positive_reduction) }}%</strong>
+                                            </li>
+                                            <li class="list-group-item">
+                                                <i class="fa-solid fa-memory"></i> Memory Usage: 
+                                                <strong class="improvement">Moderate</strong>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <a class="btn btn-outline-primary" href="/export_performance_report">
+                                <i class="fa-solid fa-download"></i> Export Performance Report
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Initialize charts
+        const procCtx = document.getElementById('processingTimeChart').getContext('2d');
+        const procChart = new Chart(procCtx, {
+            type: 'bar',
+            data: {
+                labels: ['FFT', 'Clutter Suppression', 'Doppler Processing', 'Target Classification'],
+                datasets: [{
+                    label: 'Original Algorithm',
+                    data: [25, 18, 32, 45],
+                    backgroundColor: 'rgba(108, 117, 125, 0.7)'
+                }, {
+                    label: 'Optimized Algorithm',
+                    data: [20, 12, 25, 30],
+                    backgroundColor: 'rgba(40, 167, 69, 0.7)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Processing Time (ms)'
+                        }
+                    }
+                }
+            }
+        });
+        
+        const accCtx = document.getElementById('accuracyChart').getContext('2d');
+        const accChart = new Chart(accCtx, {
+            type: 'radar',
+            data: {
+                labels: ['Range Accuracy', 'Velocity Accuracy', 'Angle Accuracy', 'Detection Rate', 'False Positives'],
+                datasets: [{
+                    label: 'Original Algorithm',
+                    data: [75, 82, 78, 80, 65],
+                    fill: true,
+                    backgroundColor: 'rgba(108, 117, 125, 0.2)',
+                    borderColor: 'rgb(108, 117, 125)',
+                    pointBackgroundColor: 'rgb(108, 117, 125)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgb(108, 117, 125)'
+                }, {
+                    label: 'Optimized Algorithm',
+                    data: [85, 90, 88, 92, 85],
+                    fill: true,
+                    backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                    borderColor: 'rgb(40, 167, 69)',
+                    pointBackgroundColor: 'rgb(40, 167, 69)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgb(40, 167, 69)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        angleLines: {
+                            display: true
+                        },
+                        suggestedMin: 50,
+                        suggestedMax: 100
+                    }
+                }
+            }
+        });
+        
+        // Update performance metrics
+        function updatePerformance() {
+            $.get('/performance_data', function(data) {
+                $('#accuracyImp').text(data.accuracy_improvement.toFixed(1) + '%');
+                $('#fpReduction').text(data.false_positive_reduction.toFixed(1) + '%');
+                $('#originalTime').text((data.original_processing_time * 1000).toFixed(0) + ' ms');
+                $('#optimizedTime').text((data.optimized_processing_time * 1000).toFixed(0) + 'ms');
+            });
+        }
+        
+        // Update every 5 seconds
+        setInterval(updatePerformance, 5000);
+        updatePerformance();
+    </script>
+</body>
+</html>

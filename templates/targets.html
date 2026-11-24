@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mmWave Radar - Target Tracking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    <style>
+        .target-card { transition: transform 0.3s; }
+        .target-card:hover { transform: translateY(-5px); }
+        .target-type-human { border-left: 4px solid #0d6efd; }
+        .target-type-vehicle { border-left: 4px solid #dc3545; }
+        .target-type-animal { border-left: 4px solid #198754; }
+        .target-type-other { border-left: 4px solid #6c757d; }
+        .trajectory-map { height: 400px; background: #f8f9fa; border-radius: 5px; }
+        .badge-human { background-color: #0d6efd; }
+        .badge-vehicle { background-color: #dc3545; }
+        .badge-animal { background-color: #198754; }
+        .badge-unknown { background-color: #ffc107; color: black; } /* Changed unknown to yellow */
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fa-solid fa-radar"></i> mmWave Radar System
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fa-solid fa-gauge"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/config">
+                            <i class="fa-solid fa-sliders"></i> Configuration
+                        </a>
+                    </li>
+                    <li class="nav-item position-relative">
+                        <a class="nav-link" href="/alerts">
+                            <i class="fa-solid fa-bell"></i> Alerts
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/performance">
+                            <i class="fa-solid fa-chart-line"></i> Performance
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/targets">
+                            <i class="fa-solid fa-bullseye"></i> Targets
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">
+            <i class="fa-solid fa-bullseye"></i> Target Tracking
+        </h1>
+        
+        <div class="row mb-4" id="targetSummary">
+            <div class="col-md-3">
+                <div class="card target-card target-type-human mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h5 class="card-title">Human Targets</h5>
+                                <h2 class="text-primary" id="humanTargets">0</h2>
+                            </div>
+                            <i class="fa-solid fa-person fa-3x text-primary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="card target-card target-type-vehicle mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h5 class="card-title">Vehicle Targets</h5>
+                                <h2 class="text-danger" id="vehicleTargets">0</h2>
+                            </div>
+                            <i class="fa-solid fa-car fa-3x text-danger"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="card target-card target-type-animal mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h5 class="card-title">Animal Targets</h5>
+                                <h2 class="text-success" id="animalTargets">0</h2>
+                            </div>
+                            <i class="fa-solid fa-dog fa-3x text-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="card target-card target-type-other mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h5 class="card-title">Other Targets</h5>
+                                <h2 class="text-secondary" id="otherTargets">0</h2>
+                            </div>
+                            <i class="fa-solid fa-question fa-3x text-secondary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fa-solid fa-location-dot"></i> Target Trajectory Map
+            </div>
+            <div class="card-body">
+                <div class="trajectory-map" id="trajectoryMap"></div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <i class="fa-solid fa-table-list"></i> Target Tracking History
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="targetTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th>ID</th>
+                                <th>Type</th>
+                                <th>First Detected</th>
+                                <th>Last Detected</th>
+                                <th>Duration</th>
+                                <th>Max Speed</th>
+                                <th>Avg Range</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for target in targets %}
+                            <tr>
+                                <td>{{ target.id }}</td>
+                                <td>
+                                    <span class="badge badge-{{ target.type }}">{{ target.type|capitalize }}</span>
+                                </td>
+                                <td>{{ target.first_detected }}</td>
+                                <td>{{ target.last_detected }}</td>
+                                <td>{{ target.duration }}</td>
+                                <td>{{ target.max_speed }}</td>
+                                <td>{{ target.avg_range }}</td>
+                                <td>
+                                    {% if target.status == 'active' %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary view-trajectory" data-id="{{ target.id }}">
+                                        <i class="fa-solid fa-map-location-dot"></i> Trajectory
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="9" class="text-center py-4">
+                                    <i class="fa-solid fa-bullseye fa-3x text-muted mb-3"></i>
+                                    <h4>No Targets Detected</h4>
+                                    <p class="text-muted">No targets have been detected yet</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trajectory Modal -->
+    <div class="modal fade" id="trajectoryModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Target Trajectory - <span id="targetIdHeader"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="targetTrajectoryMap" style="height: 400px; background: #f8f9fa;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <script>
+        // Update target counts with actual data from tracking history
+        // Function to update target counts
+        function updateTargetCounts() {
+            $.get('/target_data', function(data) {
+                $('#humanTargets').text(data.human_targets);
+                $('#vehicleTargets').text(data.vehicle_targets);
+                $('#animalTargets').text(data.animal_targets);
+                $('#otherTargets').text(data.other_targets);
+                
+                // Also update the target table if needed
+                refreshTargetTable();
+            });
+        }             
+        
+        $(document).ready(function() {
+            // Initialize DataTable
+            $('#targetTable').DataTable({
+                order: [[2, 'desc']],
+                pageLength: 5
+            });
+            
+            updateTargetCounts();  // Initial update
+
+            // Update target counts every 2 seconds
+            setInterval(updateTargetCounts, 2000);
+
+            // Initialize trajectory map
+            const mapEl = document.getElementById('trajectoryMap');
+            const ctx = mapEl.getContext('2d');
+            mapEl.width = mapEl.parentElement.clientWidth;
+            mapEl.height = 400;
+            
+            // Store target histories for visualization
+            const targetHistories = [
+                {% for target in targets %}
+                {
+                    id: {{ target.id }},
+                    type: "{{ target.type }}",
+                    history: {{ target.history | tojson }},
+                    status: "{{ target.status }}"
+                }{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ];
+            
+            // Draw trajectory map with actual data
+            function drawTrajectory() {
+                ctx.clearRect(0, 0, mapEl.width, mapEl.height);
+                
+                // Draw radar at bottom center
+                const radarX = mapEl.width / 2;
+                const radarY = mapEl.height - 20;
+                
+                // Draw radar circles
+                ctx.strokeStyle = 'rgba(0, 150, 0, 0.2)';
+                ctx.lineWidth = 1;
+                const maxRange = 30; // meters
+                const maxRadius = Math.min(mapEl.width, mapEl.height) * 0.4;
+                
+                for (let i = 1; i <= 5; i++) {
+                    const radius = maxRadius * i / 5;
+                    ctx.beginPath();
+                    ctx.arc(radarX, radarY, radius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                // Draw radar lines
+                for (let i = 0; i < 8; i++) {
+                    const angle = (Math.PI * 2 * i) / 8;
+                    ctx.beginPath();
+                    ctx.moveTo(radarX, radarY);
+                    ctx.lineTo(
+                        radarX + Math.cos(angle) * maxRadius,
+                        radarY + Math.sin(angle) * maxRadius
+                    );
+                    ctx.stroke();
+                }
+                
+                // Draw rotating line
+                const now = new Date();
+                const sweepAngle = (now.getMilliseconds() / 1000) * Math.PI * 2;
+                
+                ctx.strokeStyle = 'rgba(0, 255, 0, 0.7)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(radarX, radarY);
+                ctx.lineTo(
+                    radarX + Math.cos(sweepAngle) * maxRadius,
+                    radarY + Math.sin(sweepAngle) * maxRadius
+                );
+                ctx.stroke();
+                
+                // Draw each target's trajectory
+                targetHistories.forEach(target => {
+                    if (target.history.length === 0) return;
+                    
+                    // Set color based on target type
+                    let color;
+                    switch(target.type) {
+                        case 'human': color = '#0d6efd'; break;
+                        case 'vehicle': color = '#dc3545'; break;
+                        case 'animal': color = '#198754'; break;
+                        default: color = '#ffc107'; // yellow for unknown
+                    }
+                    
+                    // Convert history points to canvas coordinates
+                    const points = target.history.map(point => {
+                        // Scale coordinates to fit canvas
+                        const x = radarX + (point.x / 10) * (maxRadius * 0.8);
+                        const y = radarY - (point.y / maxRange) * maxRadius;
+                        return {x, y};
+                    });
+                    
+                    // Draw the path
+                    ctx.beginPath();
+                    ctx.moveTo(points[0].x, points[0].y);
+                    for (let i = 1; i < points.length; i++) {
+                        ctx.lineTo(points[i].x, points[i].y);
+                    }
+                    ctx.strokeStyle = color + '80'; // semi-transparent
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    
+                    // Draw points
+                    points.forEach((point, index) => {
+                        ctx.beginPath();
+                        ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+                        ctx.fillStyle = color;
+                        ctx.fill();
+                        
+                        // Draw target ID at the first point
+                        if (index === 0) {
+                            ctx.fillStyle = '#000';
+                            ctx.font = '10px Arial';
+                            ctx.fillText(`T${target.id}`, point.x + 8, point.y - 8);
+                        }
+                    });
+                });
+            }
+            
+            drawTrajectory();
+            
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                mapEl.width = mapEl.parentElement.clientWidth;
+                drawTrajectory();
+            }); 
+
+            // Refresh target table data
+            function refreshTargetTable() {
+                $.get('/targets?partial=1', function(html) {
+                    $('#targetTable tbody').html($(html).find('#targetTable tbody').html());
+                    initializeTargetVisualization();
+                });
+            }
+
+            // Initialize target visualization with current data
+            function initializeTargetVisualization() {
+                // Get updated target histories
+                $.get('/targets?json=1', function(targets) {
+                    targetHistories = targets;
+                    drawTrajectory();
+                });
+            }
+            
+            // View trajectory
+            $(document).on('click', '.view-trajectory', function() {
+                const targetId = $(this).data('id');
+                const target = targetHistories.find(t => t.id == targetId);
+                
+                if (!target || target.history.length < 2) {
+                    alert('No trajectory data available for this target');
+                    return;
+                }
+                
+                $('#targetIdHeader').text('Target #' + target.id);
+                const modal = new bootstrap.Modal(document.getElementById('trajectoryModal'));
+                modal.show();
+                
+                // Initialize modal map
+                const modalMap = document.getElementById('targetTrajectoryMap');
+                const modalCtx = modalMap.getContext('2d');
+                modalMap.width = modalMap.parentElement.clientWidth;
+                modalMap.height = 400;
+                
+                // Draw modal map
+                drawModalTrajectory(modalCtx, target);
+            });
+            
+            function drawModalTrajectory(ctx, target) {
+                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                
+                // Draw radar at bottom center
+                const radarX = ctx.canvas.width / 2;
+                const radarY = ctx.canvas.height - 20;
+                const maxRange = 30; // meters
+                const maxRadius = Math.min(ctx.canvas.width, ctx.canvas.height) * 0.4;
+                
+                // Draw radar background
+                ctx.strokeStyle = 'rgba(0, 150, 0, 0.2)';
+                ctx.lineWidth = 1;
+                for (let i = 1; i <= 5; i++) {
+                    const radius = maxRadius * i / 5;
+                    ctx.beginPath();
+                    ctx.arc(radarX, radarY, radius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                // Draw radar lines
+                for (let i = 0; i < 8; i++) {
+                    const angle = (Math.PI * 2 * i) / 8;
+                    ctx.beginPath();
+                    ctx.moveTo(radarX, radarY);
+                    ctx.lineTo(
+                        radarX + Math.cos(angle) * maxRadius,
+                        radarY + Math.sin(angle) * maxRadius
+                    );
+                    ctx.stroke();
+                }
+                
+                // Set color based on target type
+                let color;
+                switch(target.type) {
+                    case 'human': color = '#0d6efd'; break;
+                    case 'vehicle': color = '#dc3545'; break;
+                    case 'animal': color = '#198754'; break;
+                    default: color = '#ffc107'; // yellow for unknown
+                }
+                
+                // Convert history points to canvas coordinates
+                const points = target.history.map(point => {
+                    const x = radarX + (point.x / 10) * (maxRadius * 0.8);
+                    const y = radarY - (point.y / maxRange) * maxRadius;
+                    return {x, y, timestamp: point.timestamp};
+                });
+                
+                // Draw the path
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(points[i].x, points[i].y);
+                }
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Draw points with timestamps
+                points.forEach((point, index) => {
+                    // Point color: green for start, red for end, target color for others
+                    if (index === 0) {
+                        ctx.fillStyle = '#28a745'; // start: green
+                    } else if (index === points.length - 1) {
+                        ctx.fillStyle = '#dc3545'; // end: red
+                    } else {
+                        ctx.fillStyle = color;
+                    }
+                    
+                    ctx.beginPath();
+                    ctx.arc(point.x, point.y, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Draw timestamp for start and end points
+                    if (index === 0 || index === points.length - 1) {
+                        ctx.fillStyle = '#000';
+                        ctx.font = '10px Arial';
+                        ctx.fillText(point.timestamp, point.x + 8, point.y - 8);
+                    }
+                });
+                
+                // Draw radar position
+                ctx.fillStyle = 'rgba(13, 110, 253, 0.8)';
+                ctx.beginPath();
+                ctx.arc(radarX, radarY, 15, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw legend
+                ctx.fillStyle = '#28a745';
+                ctx.fillRect(20, 20, 15, 15);
+                ctx.fillStyle = '#000';
+                ctx.font = '12px Arial';
+                ctx.fillText('Start', 40, 30);
+                
+                ctx.fillStyle = '#dc3545';
+                ctx.fillRect(20, 40, 15, 15);
+                ctx.fillStyle = '#000';
+                ctx.fillText('End', 40, 50);
+                
+                ctx.fillStyle = color;
+                ctx.fillRect(20, 60, 15, 15);
+                ctx.fillStyle = '#000';
+                ctx.fillText('Path', 40, 70);
+            }
+            
+            // Update target counts every 3 seconds
+            setInterval(updateTargetCounts, 2000);
+            updateTargetCounts();
+        });
+    </script>
+</body>
+</html>
